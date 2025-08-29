@@ -3,6 +3,7 @@ title: "Connecting to HubSpot API with R"
 format: 
   html:
     theme: cosmo
+  pdf: default
 ---
 
 ::::  {.columns}
