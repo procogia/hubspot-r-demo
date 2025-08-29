@@ -1,0 +1,14 @@
+
+### 2. Create a .gitignore file
+```gitignore
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+.env
+.DS_Store
+*.html
+*_cache/
+*_files/
+
+*.html
