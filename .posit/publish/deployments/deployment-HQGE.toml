@@ -11,9 +11,9 @@ id = '3e91d780-43c5-4614-aec3-b581e40f511b'
 dashboard_url = 'https://connect.procogia.com/connect/#/apps/3e91d780-43c5-4614-aec3-b581e40f511b'
 direct_url = 'https://connect.procogia.com/content/3e91d780-43c5-4614-aec3-b581e40f511b/'
 logs_url = 'https://connect.procogia.com/connect/#/apps/3e91d780-43c5-4614-aec3-b581e40f511b/logs'
-deployed_at = '2025-08-29T13:28:42-07:00'
-bundle_id = '277480'
-bundle_url = 'https://connect.procogia.com/__api__/v1/content/3e91d780-43c5-4614-aec3-b581e40f511b/bundles/277480/download'
+deployed_at = '2025-08-29T14:54:07-07:00'
+bundle_id = '277481'
+bundle_url = 'https://connect.procogia.com/__api__/v1/content/3e91d780-43c5-4614-aec3-b581e40f511b/bundles/277481/download'
 files = [
   '.posit/publish/Connecting to HubSpot API with-EJ4O.toml',
   '.posit/publish/deployments/deployment-HQGE.toml',
@@ -21,6 +21,11 @@ files = [
   'images/rabbit-hockey.png',
   'renv.lock'
 ]
+
+[deployment_error]
+code = 'deployFailed'
+message = 'Rendering exited abnormally: exit status 1.'
+operation = 'publish/runContent'
 
 [configuration]
 '$schema' = 'https://cdn.posit.co/publisher/schemas/posit-publishing-schema-v3.json'
