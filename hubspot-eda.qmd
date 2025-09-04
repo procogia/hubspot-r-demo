@@ -20,10 +20,9 @@ This document demonstrates how to connect to the HubSpot API using R, brought to
 
 ::::
 
-
 ## Setup and Authentication
 
-First, let's load the required packages:
+First, let's load the required packages and helper functions:
 
 ```{r setup, message=FALSE, warning=FALSE}
 library(httr2)
@@ -36,6 +35,9 @@ library(purrr)
 # Optional: for data visualization
 library(ggplot2)
 library(scales)
+
+# Load helper functions
+source("R/hubspot-helpers.R")
 ```
 
 ### HubSpot API Authentication
@@ -44,19 +46,18 @@ HubSpot uses API keys or OAuth for authentication. For this example, we'll use a
 
 #### Step 1: Create a Private App in HubSpot
 
-1.  Go to your HubSpot account settings
-2.  Navigate to **Integrations \> Private Apps**
-3.  Click **Create a private app**
-4.  Configure the required scopes (e.g., `contacts`, `companies`, `deals`)
-5.  Generate and copy your access token
+1. Go to your HubSpot account settings
+2. Navigate to **Integrations > Private Apps**
+3. Click **Create a private app**
+4. Configure the required scopes (e.g., `contacts`, `companies`, `deals`)
+5. Generate and copy your access token
 
 #### Step 2: Store Your API Key Securely
 
 **Important**: Never hardcode API keys in your code. Use environment variables instead.
 
 Create a `.env` file in your project root (add this to `.gitignore`):
-
-```         
+```
 HUBSPOT_ACCESS_TOKEN=your_access_token_here
 ```
 
@@ -72,83 +73,11 @@ Or set the environment variable in your R session:
 ```
 
 ```{r load-token}
-# Load the access token from environment
+# Verify token is available (the helper functions will check this)
 hubspot_token <- Sys.getenv("HUBSPOT_ACCESS_TOKEN")
 
 if (hubspot_token == "") {
   stop("HubSpot access token not found. Please set HUBSPOT_ACCESS_TOKEN environment variable.")
-}
-```
-
-## Helper Functions
-
-Let's create some helper functions for making API calls:
-
-```{r helper-functions}
-# Base URL for HubSpot API
-HUBSPOT_BASE_URL <- "https://api.hubapi.com"
-
-# Helper function to make authenticated requests to HubSpot API
-hubspot_request <- function(endpoint, method = "GET", body = NULL) {
-  url <- paste0(HUBSPOT_BASE_URL, endpoint)
-  
-  req <- request(url) |>
-    req_headers(
-      Authorization = paste("Bearer", hubspot_token),
-      `Content-Type` = "application/json"
-    )
-  
-  if (method == "POST" && !is.null(body)) {
-    req <- req |> req_body_json(body)
-  }
-  
-  if (method == "GET") {
-    response <- req |> req_perform()
-  } else if (method == "POST") {
-    response <- req |> req_method("POST") |> req_perform()
-  }
-  
-  # Parse JSON response
-  content <- response |> resp_body_json()
-  return(content)
-}
-
-# Function to get all results with pagination
-hubspot_get_all <- function(endpoint, limit = 100) {
-  all_results <- list()
-  after <- NULL
-  page <- 1
-  
-  repeat {
-    # Build query parameters
-    query_params <- list(limit = limit)
-    if (!is.null(after)) {
-      query_params$after <- after
-    }
-    
-    # Construct URL with query parameters
-    query_string <- paste(names(query_params), query_params, sep = "=", collapse = "&")
-    full_endpoint <- paste0(endpoint, "?", query_string)
-    
-    cat("Fetching page", page, "...\n")
-    
-    response <- hubspot_request(full_endpoint)
-    
-    # Add results to our list
-    if (!is.null(response$results)) {
-      all_results <- c(all_results, response$results)
-    }
-    
-    # Check if there are more pages
-    if (is.null(response$paging) || is.null(response$paging$`next`)) {
-      break
-    }
-    
-    after <- response$paging$`next`$after
-    page <- page + 1
-  }
-  
-  return(all_results)
 }
 ```
 
