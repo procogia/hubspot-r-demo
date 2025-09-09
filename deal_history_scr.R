@@ -64,17 +64,51 @@ combined_hist <- bind_rows(amount_hist, stage_hist) |>
 
 combined_hist
 
-pipe <- request("https://api.hubapi.com/crm/v3/pipelines/deals/default") |>
+stage_pipe <- request("https://api.hubapi.com/crm/v3/pipelines/deals/default") |>
   req_headers(Authorization = paste("Bearer", hs_token)) |>
   req_perform() |>
   resp_body_json()
 
 stage_map <- purrr::map_dfr(
-  pipe$stages,
+  stage_pipe$stages,
   ~ tibble::tibble(
-    stageId = .x$id,
+    stage_id = .x$id,
     stage_label = .x$label
   )
 )
 
 stage_map
+
+dealstage_hist <- combined_hist |>
+  left_join(stage_map, by = "stage_id") 
+
+user_ids <- dealstage_hist |>
+  filter(source == "CRM_UI", !is.na(sourceId), nzchar(sourceId)) |>
+  distinct(sourceId) |>
+  pull()
+
+get_user <- function(uid) {
+  u <- request(glue::glue("https://api.hubapi.com/settings/v3/users/{uid}")) |>
+    req_headers(Authorization = paste("Bearer", hs_token)) |>
+    req_perform() |>
+    resp_body_json()
+
+  tibble(
+    sourceId = uid,
+    user_name = paste(u$firstName, u$lastName),
+    user_email = u$email
+  )
+}
+
+user_map <- if (length(user_ids)) {
+  map_dfr(user_ids, get_user)
+} else {
+  tibble(
+    sourceId = character(),
+    user_name = character(),
+    user_email = character()
+  )
+}
+
+user_map
+
