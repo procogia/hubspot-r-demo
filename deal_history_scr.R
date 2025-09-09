@@ -47,7 +47,7 @@ parse_property_history <- function(v, property_name) {
       ts = as_datetime(v$timestamp),
       new_value = if (is.null(v$value)) NA else as.character(v$value),
       source = if (is.null(v$sourceType)) NA_character_ else v$sourceType,
-      sourceId = if (is.null(v$sourceId)) NA_character_ else v$updatedByUserId
+      sourceId = if (is.null(v$sourceId)) NA else v$updatedByUserId
     ) 
 }
 
@@ -110,11 +110,7 @@ user_map <- if (length(user_ids)) {
 
 user_map
 
-dealstage_hist <- combined_hist |>
-  left_join(stage_map, by = "stage_id") |> 
-  left_join(all_users, by = c("sourceId", "user_name")) |> 
-  select(- starts_with("source"), -user_email) 
-dealstage_hist
+
 
 all_users <- request("https://api.hubapi.com/settings/v3/users") |>
   req_headers(Authorization = paste("Bearer", hs_token)) |>
@@ -122,7 +118,14 @@ all_users <- request("https://api.hubapi.com/settings/v3/users") |>
   resp_body_json() |>
   pluck("results") |>
   map_dfr(~ tibble(
-    user_id = .x$id,
+    user_id = .x$id |> as.integer(),
     user_name = paste(.x$firstName, .x$lastName),
     user_email = .x$email
   ))
+
+dealstage_hist <- combined_hist |>
+  left_join(stage_map, by = "stage_id") |>
+  left_join(all_users, by = c("sourceId" = "user_id")) |>
+  select(-starts_with("source"), -user_email)
+dealstage_hist
+
