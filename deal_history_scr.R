@@ -79,10 +79,8 @@ stage_map <- purrr::map_dfr(
 
 stage_map
 
-dealstage_hist <- combined_hist |>
-  left_join(stage_map, by = "stage_id") 
 
-user_ids <- dealstage_hist |>
+user_ids <- combined_hist |>
   filter(source == "CRM_UI", !is.na(sourceId), nzchar(sourceId)) |>
   distinct(sourceId) |>
   pull()
@@ -112,3 +110,19 @@ user_map <- if (length(user_ids)) {
 
 user_map
 
+dealstage_hist <- combined_hist |>
+  left_join(stage_map, by = "stage_id") |> 
+  left_join(all_users, by = c("sourceId", "user_name")) |> 
+  select(- starts_with("source"), -user_email) 
+dealstage_hist
+
+all_users <- request("https://api.hubapi.com/settings/v3/users") |>
+  req_headers(Authorization = paste("Bearer", hs_token)) |>
+  req_perform() |>
+  resp_body_json() |>
+  pluck("results") |>
+  map_dfr(~ tibble(
+    user_id = .x$id,
+    user_name = paste(.x$firstName, .x$lastName),
+    user_email = .x$email
+  ))
