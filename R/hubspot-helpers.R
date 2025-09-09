@@ -130,3 +130,68 @@ process_contacts <- function(contacts_list) {
       )
     })
 }
+#' Get deal history/timeline for a specific deal
+#' @param deal_id HubSpot deal ID
+#' @return List of timeline events
+get_deal_history <- function(deal_id) {
+  tryCatch({
+    endpoint <- paste0("/crm/v3/objects/deals/", deal_id, "/timeline")
+    hubspot_request(endpoint)
+  }, error = function(e) {
+    cat("Error getting deal history for deal", deal_id, ":", e$message, "\n")
+    return(NULL)
+  })
+}
+
+#' Get random sample of deals with basic properties
+#' @param n Number of deals to sample
+#' @return List of deal objects
+get_random_deals <- function(n = 25) {
+  # First get total count
+  total_count <- get_deals_count()
+  
+  if (is.null(total_count) || total_count < n) {
+    cat("Warning: Requested", n, "deals but only", total_count, "available\n")
+    n <- min(n, total_count)
+  }
+  
+  # Get random offset
+  max_offset <- max(0, total_count - n)
+  random_offset <- sample(0:max_offset, 1)
+  
+  search_body <- list(
+    filterGroups = list(),
+    sorts = list(),
+    properties = c("dealname", "amount", "dealstage", "pipeline", "createdate", "closedate"),
+    limit = n,
+    after = random_offset
+  )
+  
+  response <- hubspot_request("/crm/v3/objects/deals/search", method = "POST", body = search_body)
+  return(response$results)
+}
+
+#' Get company name for a deal
+#' @param deal_id Deal ID
+#' @return Company name or NA
+get_deal_company <- function(deal_id) {
+  tryCatch({
+    # Get associations to companies
+    endpoint <- paste0("/crm/v3/objects/deals/", deal_id, "/associations/companies")
+    associations <- hubspot_request(endpoint)
+    
+    if (length(associations$results) > 0) {
+      company_id <- associations$results[[1]]$id
+      
+      # Get company details
+      company_endpoint <- paste0("/crm/v3/objects/companies/", company_id, "?properties=name")
+      company <- hubspot_request(company_endpoint)
+      
+      return(company$properties$name %||% NA)
+    }
+    
+    return(NA)
+  }, error = function(e) {
+    return(NA)
+  })
+}
