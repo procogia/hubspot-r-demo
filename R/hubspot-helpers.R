@@ -2,6 +2,14 @@
 # Base URL for HubSpot API
 HUBSPOT_BASE_URL <- "https://api.hubapi.com"
 
+# ── Setup ───────────────────────────────────────────────────────────────────────
+library(httr2)
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(lubridate)
+library(tibble)
+
 #' Make authenticated requests to HubSpot API
 #' @param endpoint API endpoint path
 #' @param method HTTP method (GET or POST)
@@ -130,18 +138,6 @@ process_contacts <- function(contacts_list) {
       )
     })
 }
-#' Get deal history/timeline for a specific deal
-#' @param deal_id HubSpot deal ID
-#' @return List of timeline events
-get_deal_history <- function(deal_id) {
-  tryCatch({
-    endpoint <- paste0("/crm/v3/objects/deals/", deal_id, "/timeline")
-    hubspot_request(endpoint)
-  }, error = function(e) {
-    cat("Error getting deal history for deal", deal_id, ":", e$message, "\n")
-    return(NULL)
-  })
-}
 
 #' Get random sample of deals with basic properties
 #' @param n Number of deals to sample
@@ -194,4 +190,253 @@ get_deal_company <- function(deal_id) {
   }, error = function(e) {
     return(NA)
   })
+}
+
+#' Get all users from HubSpot
+#' @return Tibble with user_id, user_name, user_email
+get_users <- function() {
+  tryCatch({
+    user_response <- hubspot_request("/settings/v3/users")
+    
+    if (!is.null(user_response$results)) {
+      user_map <- map_dfr(user_response$results, ~ tibble(
+        user_id = .x$id |> as.integer(),
+        user_name = paste(.x$firstName %||% "Unknown", .x$lastName %||% "User"),
+        user_email = .x$email %||% NA_character_
+      ))
+      return(user_map)
+    } else {
+      return(tibble(
+        user_id = integer(),
+        user_name = character(),
+        user_email = character()
+      ))
+    }
+  }, error = function(e) {
+    cat("Error getting users:", e$message, "\n")
+    return(tibble(
+      user_id = integer(),
+      user_name = character(),
+      user_email = character()
+    ))
+  })
+}
+
+#' Get deal stages from HubSpot pipeline
+#' @param pipeline_id Pipeline ID (default is "default")
+#' @return Tibble with stage_id, stage_label
+get_stages <- function(pipeline_id = "default") {
+  tryCatch({
+    endpoint <- paste0("/crm/v3/pipelines/deals/", pipeline_id)
+    stage_response <- hubspot_request(endpoint)
+    
+    if (!is.null(stage_response$stages)) {
+      stage_map <- map_dfr(stage_response$stages, ~ tibble(
+        stage_id = .x$id,
+        stage_label = .x$label
+      ))
+      return(stage_map)
+    } else {
+      return(tibble(
+        stage_id = character(),
+        stage_label = character()
+      ))
+    }
+  }, error = function(e) {
+    cat("Error getting stages:", e$message, "\n")
+    return(tibble(
+      stage_id = character(),
+      stage_label = character()
+    ))
+  })
+}
+
+#' Get deal history for multiple deals
+#' @param d Vector of deal IDs
+#' @return Tibble with deal history including deal_id column
+get_deal_history <- function(d) {
+  # Helper function to parse property history
+  parse_property_history <- function(v, property_name) {
+    tibble(
+      property = property_name,
+      ts = as_datetime(v$timestamp),
+      new_value = if (is.null(v$value)) NA else as.character(v$value),
+      source = if (is.null(v$sourceType)) NA_character_ else v$sourceType,
+      sourceId = if (is.null(v$sourceId)) NA else v$updatedByUserId
+    )
+  }
+  
+  # Get users and stages for joins
+  user_map <- get_users()
+  stage_map <- get_stages()
+  
+  # Process each deal
+  all_deal_history <- map_dfr(d, function(deal_id) {
+    tryCatch(
+      {
+        # Get deal with property history
+        deal_response <- request(glue::glue(
+          "https://api.hubapi.com/crm/v3/objects/deals/{deal_id}"
+        )) |>
+          req_headers(Authorization = paste("Bearer", hubspot_token)) |>
+          req_url_query(
+            .multi = "explode",
+            propertiesWithHistory = c("amount", "dealstage")
+          ) |>
+          req_perform() |>
+          resp_body_json()
+
+
+        # Extract property histories
+        ph <- deal_response$propertiesWithHistory[c("amount", "dealstage")]
+
+        if (is.null(ph) || (is.null(ph$amount) && is.null(ph$dealstage))) {
+          return(tibble())
+        }
+
+        # Parse histories
+        amount_hist <- if (!is.null(ph$amount)) {
+          map_dfr(
+            ph$amount,
+            parse_property_history,
+            property_name = "amount"
+          ) |>
+            arrange(ts)
+        } else {
+          tibble()
+        }
+
+        stage_hist <- if (!is.null(ph$dealstage)) {
+          map_dfr(
+            ph$dealstage,
+            parse_property_history,
+            property_name = "stage_id"
+          ) |>
+            arrange(ts)
+        } else {
+          tibble()
+        }
+
+        # Combine histories
+        combined_hist <- bind_rows(amount_hist, stage_hist) |>
+          pivot_wider(names_from = property, values_from = new_value) |>
+          arrange(ts) |>
+          fill(amount, stage_id, .direction = "down") |>
+          mutate(deal_id = deal_id, .before = 1) # Add deal_id as first column
+
+        # Join with stage and user information
+        dealstage_hist <- combined_hist |>
+          left_join(stage_map, by = "stage_id") |>
+          left_join(user_map, by = c("sourceId" = "user_id")) |>
+          select(deal_id, ts, amount, stage_id, stage_label, user_name)
+
+        return(dealstage_hist)
+      },
+      error = function(e) {
+        cat("Warning getting history for deal", deal_id, ":", e$message, "\n")
+        return(tibble())
+      }
+    )
+  })
+  
+  return(all_deal_history)
+}
+
+#' Get all deals with creation time and basic properties
+#' @param limit Number of deals per API call (default 100, max 100)
+#' @return Tibble with deal_id, deal_name, created_date, and other basic properties
+get_all_deals_with_creation <- function(limit = 100) {
+  cat("🔍 Fetching all deals with creation time from HubSpot...\n")
+
+  all_deals <- list()
+  after <- NULL
+  page <- 1
+
+  repeat {
+    tryCatch(
+      {
+        cat("📄 Fetching page", page, "...\n")
+
+        # Use the regular objects endpoint with pagination
+        endpoint <- "/crm/v3/objects/deals"
+        query_params <- list(
+          limit = limit,
+          properties = paste(
+            c(
+              "dealname",
+              "amount",
+              "dealstage",
+              "createdate",
+              "closedate",
+              "hs_lastmodifieddate"
+            ),
+            collapse = ","
+          )
+        )
+
+        # Add pagination if needed
+        if (!is.null(after)) {
+          query_params$after <- after
+        }
+
+        # Build query string
+        query_string <- paste(
+          names(query_params),
+          query_params,
+          sep = "=",
+          collapse = "&"
+        )
+        full_endpoint <- paste0(endpoint, "?", query_string)
+
+        response <- hubspot_request(full_endpoint)
+
+        # Extract deals from this page
+        if (!is.null(response$results) && length(response$results) > 0) {
+          all_deals <- c(all_deals, response$results)
+
+          cat(
+            "   ✅",
+            length(response$results),
+            "deals retrieved (total so far:",
+            length(all_deals),
+            ")\n"
+          )
+        }
+
+        # Check if there are more pages
+        if (is.null(response$paging) || is.null(response$paging$`next`)) {
+          break
+        }
+
+        after <- response$paging$`next`$after
+        page <- page + 1
+
+        # Small delay to respect rate limits
+        Sys.sleep(0.1)
+      },
+      error = function(e) {
+        cat("❌ Error on page", page, ":", e$message, "\n")
+        break
+      }
+    )
+  }
+
+  cat("🎉 Total deals retrieved:", length(all_deals), "\n")
+
+  # Convert to tibble
+  deals_df <- map_dfr(all_deals, function(deal) {
+    props <- deal$properties
+    tibble(
+      deal_id = deal$id,
+      deal_name = props$dealname %||% "Unnamed Deal",
+      amount = as.numeric(props$amount %||% 0),
+      stage = props$dealstage %||% "Unknown",
+      pipeline = props$pipeline %||% "default",
+      created_date = as.Date(props$createdate),
+      modified_date = as.Date(props$hs_lastmodifieddate),
+      close_date = as.Date(props$closedate)
+    )
+  })
+
+  return(deals_df)
 }

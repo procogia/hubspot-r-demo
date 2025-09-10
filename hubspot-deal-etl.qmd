@@ -1,5 +1,5 @@
 ---
-title: "Deal dbg"
+title: "HubSpot Deal ETL"
 subtitle: "Tracking Deal Status and Amount Changes"
 format: 
   html:
@@ -32,8 +32,9 @@ if (hubspot_token == "") {
 }
 ```
 
-from PA
+## ETL Process for HubSpot Deals
 
+### Get the stages for deals and all deals with creation time
 ```{r get-specific-deal}
 # Get custom stage labels
 stages <- get_stages()
@@ -43,20 +44,37 @@ all_deals <- get_all_deals_with_creation()
 
 # Show summary
 cat("Total deals:", nrow(all_deals), "\n")
-cat("Date range:", paste0(range(all_deals$created_date), collapse = ' to '), "\n")
+cat(
+  "Date range:",
+  paste0(range(all_deals$created_date), collapse = ' to '),
+  "\n"
+)
+```
 
-# Check which deals have history
-deal_history <- get_deal_history(all_deals$deal_id)
-deal_history_count <- deal_history |>
-  count(deal_id, name = "n_history") 
+### Get deal histories and join with deal info
+```{r deal-history}
+load_from_disk <- TRUE
+if (
+  load_from_disk &
+    file.exists("deal_history.rds") &
+    file.exists("deals.rds")
+) {
+  deal_history <- readRDS("deal_history.rds")
+  deals <- readRDS("deals.rds")
+} else {
+  deal_history <- get_deal_history(all_deals$deal_id)
+  deal_history_count <- deal_history |>
+    count(deal_id, name = "n_history")
 
-# Join with deal info
-deals <- all_deals |>
-  left_join(deal_history_count, by = "deal_id") |> 
-  left_join(stages, by = c("stage" = "stage_id"))
+  # Join with deal info
+  deals <- all_deals |>
+    left_join(deal_history_count, by = "deal_id") |>
+    left_join(stages, by = c("stage" = "stage_id"))
+}
 
 ```
 
+### Pin the data for future use
 ```{r pin-deals}
 board <- board_connect()
 board |>
@@ -83,6 +101,7 @@ deals |>
   count(has_history) |>
   gt()
 ```
+
 
 ## Deals Lookup
 ```{r}
