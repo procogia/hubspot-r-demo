@@ -1,0 +1,132 @@
+---
+title: "Deal dbg"
+subtitle: "Tracking Deal Status and Amount Changes"
+format: 
+  html:
+    theme: cosmo
+    toc: true
+    code-fold: show
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+library(httr2)
+library(jsonlite)
+library(dplyr)
+library(tibble)
+library(knitr)
+library(purrr)
+library(lubridate)
+library(reactable)
+library(pins)
+library(gt)
+
+# Load helper functions
+source("R/hubspot-helpers.R")
+
+# Set up token
+hubspot_token <- Sys.getenv("HUBSPOT_ACCESS_TOKEN")
+if (hubspot_token == "") {
+  stop(
+    "HubSpot access token not found. Please set HUBSPOT_ACCESS_TOKEN environment variable."
+  )
+}
+```
+
+from PA
+
+```{r get-specific-deal}
+# Get custom stage labels
+stages <- get_stages()
+
+# Get all deals with creation time
+all_deals <- get_all_deals_with_creation()
+
+# Show summary
+cat("Total deals:", nrow(all_deals), "\n")
+cat("Date range:", paste0(range(all_deals$created_date), collapse = ' to '), "\n")
+
+# Check which deals have history
+deal_history <- get_deal_history(all_deals$deal_id)
+deal_history_count <- deal_history |>
+  count(deal_id, name = "n_history") 
+
+# Join with deal info
+deals <- all_deals |>
+  left_join(deal_history_count, by = "deal_id") |> 
+  left_join(stages, by = c("stage" = "stage_id"))
+
+```
+
+```{r pin-deals}
+board <- board_connect()
+board |>
+  pin_write(
+    deals,
+    "deals",
+    type = "csv",
+    description = "All deals with history count"
+  )
+board |>
+  pin_write(
+    deal_history,
+    "deal_history",
+    type = "csv",
+    description = "Deal history records"
+  )
+
+```
+
+## Some deals don't have history
+```{r}
+deals |> 
+  mutate(has_history = ! is.na(n_history)) |>
+  count(has_history) |>
+  gt()
+```
+
+## Deals Lookup
+```{r}
+deals |>
+  select(-stage, -pipeline) |>
+  reactable(
+    searchable = TRUE,
+    filterable = TRUE,
+    columns = list(
+      deal_id = colDef(name = "Deal ID"),
+      deal_name = colDef(name = "Deal Name"),
+      amount = colDef(name = "Amount", format = colFormat(currency = "USD")),
+      stage_label = colDef(name = "Stage"),
+      created_date = colDef(name = "Created"),
+      modified_date = colDef(name = "Modified"),
+      close_date = colDef(name = "Close Date"),
+      n_history = colDef(name = "History Count")
+    )
+  )
+```
+
+## Deal History Lookup
+
+```{r}
+#default the DealID to the first deal with history
+default_deal_id <- deals |> filter(n_history > 0) |> slice(1) |> pull(deal_id)
+
+deal_history |>
+  reactable(
+    searchable = TRUE,
+    filterable = TRUE,
+    defaultPageSize = 25,
+    columns = list(
+      deal_id = colDef(
+        name = "Deal ID",
+        searchable = TRUE,
+        filterable = TRUE,
+      ),
+      ts = colDef(name = "Timestamp"),
+      amount = colDef(name = "Amount", format = colFormat(currency = "USD")),
+      stage_id = colDef(name = "Stage ID"),
+      stage_label = colDef(name = "Stage"),
+      user_name = colDef(name = "User")
+    )
+  )
+```
+
