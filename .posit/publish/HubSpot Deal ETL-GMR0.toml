@@ -11,9 +11,7 @@ files = [
   '/renv.lock',
   '/.posit/publish/HubSpot Deal ETL-GMR0.toml',
   '/.posit/publish/deployments/deployment-CR4R.toml',
-  '/R/hubspot-helpers.R',
-  '/deal_history.rds',
-  '/deals.rds'
+  '/R/hubspot-helpers.R'
 ]
 title = 'HubSpot Deal ETL'
 secrets = ['HUBSPOT_ACCESS_TOKEN']

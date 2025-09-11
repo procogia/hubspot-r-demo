@@ -19,6 +19,8 @@ library(lubridate)
 library(reactable)
 library(pins)
 library(gt)
+library(nanoparquet)
+library(tictoc)
 
 # Load helper functions
 source("R/hubspot-helpers.R")
@@ -30,48 +32,102 @@ if (hubspot_token == "") {
     "HubSpot access token not found. Please set HUBSPOT_ACCESS_TOKEN environment variable."
   )
 }
+tic("Total ETL time")
 ```
 
 ## ETL Process for HubSpot Deals
+
+### Load existing data if available
+
+```{r}
+tic("Load existing data")
+# Check if data exists as a pin
+board <- board_connect()
+
+deals_pin_exists <- FALSE
+deal_history_pin_exists <- FALSE
+
+try(
+  {
+    deals <- board |> pin_read("deals") 
+    deals_pin_exists <- TRUE
+  },
+  silent = TRUE
+)
+
+try(
+  {
+    deal_history <- board |> pin_read("deal_history") 
+    deal_history_pin_exists <- TRUE
+  },
+  silent = TRUE
+)
+
+if (deals_pin_exists & deal_history_pin_exists) {
+  last_deal_update <- max(deals$modified_date, na.rm = TRUE)
+  cat("Loaded existing data from pins\n")
+  cat("Deals:", nrow(deals), "\n")
+  cat("Deal history records:", nrow(deal_history), "\n")
+  cat("Last deal modified date:", last_deal_update, "\n")
+} else {
+  cat("No existing pins found, will fetch fresh data\n")
+  last_deal_update <- today() 
+}
+toc()
+```
+
+
 
 ### Get the stages for deals and all deals with creation time
 ```{r get-specific-deal}
 # Get custom stage labels
 stages <- get_stages()
 
-# Get all deals with creation time
+# Get all deals with  time stats
 all_deals <- get_all_deals_with_creation()
 
 # Show summary
 cat("Total deals:", nrow(all_deals), "\n")
+cat("Ignoring deals modified before:", last_deal_update, "\n")
+
+latest_deals <- all_deals |>
+  filter(modified_date >= last_deal_update)
+
+cat("Remaining deals:", nrow(latest_deals), "\n")
 cat(
   "Date range:",
-  paste0(range(all_deals$created_date), collapse = ' to '),
+  paste0(range(latest_deals$modified_date), collapse = ' to '),
   "\n"
 )
+
+
 ```
 
 ### Get deal histories and join with deal info
 ```{r deal-history}
-load_from_disk <- TRUE
-if (
-  load_from_disk &
-    file.exists("deal_history.rds") &
-    file.exists("deals.rds")
-) {
-  deal_history <- readRDS("deal_history.rds")
-  deals <- readRDS("deals.rds")
-} else {
-  deal_history <- get_deal_history(all_deals$deal_id)
-  deal_history_count <- deal_history |>
-    count(deal_id, name = "n_history")
-
-  # Join with deal info
-  deals <- all_deals |>
-    left_join(deal_history_count, by = "deal_id") |>
-    left_join(stages, by = c("stage" = "stage_id"))
+tic("Get deal histories")
+if (exists("deals") & exists("deal_history")) {
+  previous_deal_data <- deals |> filter(!deal_id %in% latest_deals$deal_id)
+  previous_deal_history <- deal_history |>
+    filter(!deal_id %in% latest_deals$deal_id)
 }
+update_deal_history <- get_deal_history(latest_deals$deal_id)
+update_deal_history_count <- update_deal_history |>
+  count(deal_id, name = "n_history")
 
+# Join with deal info
+update_deals <- latest_deals |>
+  left_join(update_deal_history_count, by = "deal_id") |>
+  left_join(stages, by = c("stage" = "stage_id"))
+
+if (exists("previous_deal_data")) {
+  deals <- bind_rows(previous_deal_data, update_deals)
+  deal_history <- bind_rows(previous_deal_history, update_deal_history)
+} else {
+  deals <- update_deal_history
+  deal_history <- update_deal_history
+}
+toc()
 ```
 
 ### Pin the data for future use
@@ -81,14 +137,14 @@ board |>
   pin_write(
     deals,
     "deals",
-    type = "csv",
+    type = "parquet",
     description = "All deals with history count"
   )
 board |>
   pin_write(
     deal_history,
     "deal_history",
-    type = "csv",
+    type = "parquet",
     description = "Deal history records"
   )
 
@@ -149,3 +205,9 @@ deal_history |>
   )
 ```
 
+## Final timing
+
+
+```{r}
+toc()
+```
