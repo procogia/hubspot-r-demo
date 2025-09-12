@@ -88,28 +88,39 @@ hubspot_get_all <- function(endpoint, limit = 100) {
 
 #' Get total count of deals without retrieving all data
 #' @return Total number of deals or NULL if error
-get_deals_count <- function() {
-  tryCatch({
-    # Use the search endpoint to get just the count
-    search_endpoint <- "/crm/v3/objects/deals/search"
-    
-    search_body <- list(
-      filterGroups = list(), # No filters = all deals
-      sorts = list(),
-      properties = list("hs_object_id"), # Minimal property to reduce response size
-      limit = 1, # We only need the count, not the actual data
-      after = 0
-    )
-    
-    response <- hubspot_request(search_endpoint, method = "POST", body = search_body)
-    
-    # Return the total count
-    return(response$total)
-    
-  }, error = function(e) {
-    cat("Error getting deals count:", e$message, "\n")
-    return(NULL)
-  })
+get_deals_count <- function() get_objects_count('deals') # Wrapper for deals (legacy)
+
+#' Get total count of objects without retrieving all data
+#' @return Total number of objects or NULL if error
+get_objects_count <- function(obj = 'deals') {
+  # deals, leads, # not tested: contacts, companies, tickets, leads
+  tryCatch(
+    {
+      # Use the search endpoint to get just the count
+      search_endpoint <- sprintf("/crm/v3/objects/%s/search", obj)
+
+      search_body <- list(
+        filterGroups = list(), 
+        sorts = list(),
+        properties = list("hs_object_id"), # Minimal property to reduce response size
+        limit = 1, # We only need the count, not the actual data
+        after = 0
+      )
+
+      response <- hubspot_request(
+        search_endpoint,
+        method = "POST",
+        body = search_body
+      )
+
+      # Return the total count
+      return(response$total)
+    },
+    error = function(e) {
+      cat(sprintf("Error getting %s count: %s\n", obj, e$message))
+      return(NULL)
+    }
+  )
 }
 
 #' Safe version of hubspot_request with error handling
@@ -439,4 +450,137 @@ get_all_deals_with_creation <- function(limit = 100) {
   })
 
   return(deals_df)
+}
+
+#' Get all leads with creation time and basic properties
+#' @param limit Number of leads per API call (default 100, max 100)
+#' @return Tibble with lead_id, lead_name, created_date, and other basic properties
+get_all_leads_with_creation <- function(limit = 100) {
+  cat("🔍 Fetching all leads with creation time from HubSpot...\n")
+
+  all_leads <- list()
+  after <- NULL
+  page <- 1
+
+  #repeat {
+    tryCatch(
+      {
+        cat("📄 Fetching page", page, "...\n")
+
+        # Use the regular objects endpoint with pagination
+        endpoint <- "/crm/v3/objects/leads"
+        query_params <- list(
+          limit = limit,
+          properties = paste(
+            c(
+              "hs_lead_name",
+              "hs_lead_type",
+              "hs_lead_label",
+              "createdate",
+              "closedate",
+              "hs_lastmodifieddate",
+              "hs_pipeline_stage",
+              "archived"
+            ),
+            collapse = ","
+          )
+        )
+
+        # Add pagination if needed
+        if (!is.null(after)) {
+          query_params$after <- after
+        }
+
+        # Build query string
+        query_string <- paste(
+          names(query_params),
+          query_params,
+          sep = "=",
+          collapse = "&"
+        )
+        full_endpoint <- paste0(endpoint, "?", query_string)
+
+        response <- hubspot_request(full_endpoint)
+
+        # Extract leads from this page
+        if (!is.null(response$results) && length(response$results) > 0) {
+          all_leads <- c(all_leads, response$results)
+
+          cat(
+            "   ✅",
+            length(response$results),
+            "leads retrieved (total so far:",
+            length(all_leads),
+            ")\n"
+          )
+        }
+
+        # Check if there are more pages
+        if (is.null(response$paging) || is.null(response$paging$`next`)) {
+          break
+        }
+
+        after <- response$paging$`next`$after
+        page <- page + 1
+
+        # Small delay to respect rate limits
+        Sys.sleep(0.1)
+      },
+      error = function(e) {
+        cat("❌ Error on page", page, ":", e$message, "\n")
+        break
+      }
+    )
+  #}
+
+  cat("🎉 Total leads retrieved:", length(all_leads), "\n")
+
+  # Convert to tibble
+  leads_df <- map_dfr(all_leads, function(lead) {
+    props <- lead$properties
+    tibble(
+      lead_id = lead$id,
+      lead_type = props$hs_lead_type %||% "Unknown",
+      lead_stage = props$hs_pipeline_stage %||% "Unknown",
+      lead_name = props$hs_lead_name %||% "Unnamed lead",
+      lead_label = props$hs_lead_label %||% "Unknown",
+      created_date = as.Date(props$hs_createdate),
+      modified_date = as.Date(props$hs_lastmodifieddate),
+    )
+  })
+  
+
+  return(leads_df)
+}
+
+get_lead_properties <- function() {
+  cat("🔍 Fetching lead properties from HubSpot...\n")
+  
+  tryCatch({
+    response <- hubspot_request("/crm/v3/properties/leads")
+    
+    if (!is.null(response$results)) {
+      properties_df <- map_dfr(response$results, function(prop) {
+        tibble(
+          name = prop$name,
+          label = prop$label %||% NA_character_,
+          description = prop$description %||% NA_character_,
+          type = prop$type %||% NA_character_,
+          fieldType = prop$fieldType %||% NA_character_,
+          groupName = prop$groupName %||% NA_character_,
+          calculated = prop$calculated %||% FALSE,
+          hidden = prop$hidden %||% FALSE
+        )
+      })
+      
+      cat("✅", nrow(properties_df), "lead properties retrieved\n")
+      return(properties_df)
+    } else {
+      cat("⚠️ No properties found in response\n")
+      return(tibble())
+    }
+  }, error = function(e) {
+    cat("❌ Error getting lead properties:", e$message, "\n")
+    return(tibble())
+  })
 }
