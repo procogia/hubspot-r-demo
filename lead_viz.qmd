@@ -1,0 +1,63 @@
+---
+title: "Lead Stage Transitions"
+format: 
+  html:
+    theme: cosmo
+    toc: true
+    code-fold: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r}
+library(dplyr)
+library(networkD3)
+library(pins)
+```
+
+## Load lead history data
+
+Pinned via [https://connect.procogia.com/lead-sankey/](https://connect.procogia.com/leads-etl/)
+
+NOTE: Data is currently a small sample for demo purposes only.
+
+```{r}
+board <- board_connect()
+leads <- board |> pin_read("leads")
+lead_history <- board |> pin_read("lead_history")
+```
+
+## Sankey diagram
+
+```{r}
+# Create transitions from lead_history
+transitions <- lead_history %>%
+  arrange(lead_id, ts) %>%
+  group_by(lead_id) %>%
+  mutate(next_stage = lead(stage_label)) %>%
+  filter(!is.na(next_stage)) %>%
+  count(stage_label, next_stage, name = "value") %>%
+  ungroup()
+
+# Create nodes
+nodes <- data.frame(
+  name = unique(c(transitions$stage_label, transitions$next_stage)),
+  stringsAsFactors = FALSE
+) %>%
+  mutate(id = row_number() - 1)
+
+# Create links with node IDs
+links <- transitions %>%
+  left_join(nodes, by = c("stage_label" = "name")) %>%
+  rename(source = id) %>%
+  left_join(nodes, by = c("next_stage" = "name")) %>%
+  rename(target = id) %>%
+  select(source, target, value)
+
+# Create sankey diagram
+sankeyNetwork(Links = links, Nodes = nodes, Source = "source",
+              Target = "target", Value = "value", NodeID = "name",
+              fontSize = 12, nodeWidth = 30)
+```

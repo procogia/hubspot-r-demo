@@ -5,7 +5,7 @@ format:
   html:
     theme: cosmo
     toc: true
-    code-fold: show
+    code-fold: true
 ---
 
 ```{r setup, message=FALSE, warning=FALSE}

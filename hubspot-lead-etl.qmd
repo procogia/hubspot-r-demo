@@ -10,10 +10,10 @@ format:
 
 Creates/updates pins for leads and lead history from HubSpot.
 
-| object | Description | Pin URL | Full Pin URL |
-|----|----|----|----|
-| leads | Hubspot leads | <https://connect.procogia.com/leads/> | https://connect.procogia.com/content/51f8e6cd-0d15-419a-9a9d-7e73506dfd53 |
-| lead_history | Stage changes to leads | <https://connect.procogia.com/lead_history/> | <https://connect.procogia.com/content/13b97499-4d74-47f5-90e2-deba6f136e47> |
+| object | Description | Pin URL |
+|----------------|---------------------------|------------------------------|
+| leads | Hubspot leads | <https://connect.procogia.com/leads/> |
+| lead_history | Stage changes to leads | <https://connect.procogia.com/lead_history/> |
 
 : Pin outputs
 

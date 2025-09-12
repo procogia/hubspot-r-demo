@@ -6,19 +6,18 @@ client_version = '1.20.0'
 created_at = ''
 dismissed_at = ''
 type = 'quarto-static'
-configuration_name = 'HubSpot Lead ETL-62RF'
-id = 'b9b0becb-e19f-4922-beca-dcfffaf81324'
-dashboard_url = 'https://connect.procogia.com/connect/#/apps/b9b0becb-e19f-4922-beca-dcfffaf81324'
-direct_url = 'https://connect.procogia.com/content/b9b0becb-e19f-4922-beca-dcfffaf81324/'
-logs_url = 'https://connect.procogia.com/connect/#/apps/b9b0becb-e19f-4922-beca-dcfffaf81324/logs'
-deployed_at = '2025-09-12T14:49:51-07:00'
-bundle_id = '277505'
-bundle_url = 'https://connect.procogia.com/__api__/v1/content/b9b0becb-e19f-4922-beca-dcfffaf81324/bundles/277505/download'
+configuration_name = 'Lead Stage Transitions-PC9D'
+id = 'd32727ce-893f-4d83-b9ab-5cc3ba086fc1'
+dashboard_url = 'https://connect.procogia.com/connect/#/apps/d32727ce-893f-4d83-b9ab-5cc3ba086fc1'
+direct_url = 'https://connect.procogia.com/content/d32727ce-893f-4d83-b9ab-5cc3ba086fc1/'
+logs_url = 'https://connect.procogia.com/connect/#/apps/d32727ce-893f-4d83-b9ab-5cc3ba086fc1/logs'
+deployed_at = '2025-09-12T15:08:27-07:00'
+bundle_id = '277507'
+bundle_url = 'https://connect.procogia.com/__api__/v1/content/d32727ce-893f-4d83-b9ab-5cc3ba086fc1/bundles/277507/download'
 files = [
-  '.posit/publish/HubSpot Lead ETL-62RF.toml',
-  '.posit/publish/deployments/deployment-1L8R.toml',
-  'R/hubspot-helpers.R',
-  'hubspot-lead-etl.qmd',
+  '.posit/publish/Lead Stage Transitions-PC9D.toml',
+  '.posit/publish/deployments/deployment-D42D.toml',
+  'lead_viz.qmd',
   'renv.lock'
 ]
 
@@ -26,17 +25,15 @@ files = [
 product_type = 'connect'
 '$schema' = 'https://cdn.posit.co/publisher/schemas/posit-publishing-schema-v3.json'
 type = 'quarto-static'
-entrypoint = 'hubspot-lead-etl.qmd'
+entrypoint = 'lead_viz.qmd'
 validate = true
 files = [
-  '/hubspot-lead-etl.qmd',
+  '/lead_viz.qmd',
   '/renv.lock',
-  '/.posit/publish/HubSpot Lead ETL-62RF.toml',
-  '/.posit/publish/deployments/deployment-1L8R.toml',
-  '/R/hubspot-helpers.R'
+  '/.posit/publish/Lead Stage Transitions-PC9D.toml',
+  '/.posit/publish/deployments/deployment-D42D.toml'
 ]
-title = 'HubSpot Lead ETL'
-secrets = ['HUBSPOT_ACCESS_TOKEN']
+title = 'Lead Stage Transitions'
 
 [configuration.r]
 version = '4.5.0'
@@ -474,6 +471,29 @@ needscompilation = 'yes'
 author = 'Jeroen Ooms [aut, cre] (ORCID: <https://orcid.org/0000-0002-4035-0289>), Hadley Wickham [ctb], Posit Software, PBC [cph]'
 systemrequirements = 'libcurl (>= 7.73): libcurl-devel (rpm) or libcurl4-openssl-dev (deb)'
 
+[renv.packages.'data.tree']
+package = 'data.tree'
+version = '1.2.0'
+source = 'Repository'
+repository = 'CRAN'
+depends = ['R (>= 3.5)']
+hash = ''
+type = 'Package'
+title = 'General Purpose Hierarchical Data Structure'
+'authors@r' = 'c( person( "Russ", "Hyde", role = c("ctb"), comment = "improve dependencies" ), person( "Chris", "Hammill", role = c("ctb"), comment = "improve getting" ), person( "Facundo", "Munoz", role = c("ctb"), comment = "improve list conversion" ), person( "Markus", "Wamser" , role = c("ctb") , comment = "fixed some typos" ), person( "Pierre", "Formont" , role = c("ctb") , comment = "additional features" ), person( "Kent", "Russel" , role = c("ctb") , comment = "documentation" ), person( "Noam", "Ross" , role = c("ctb") , comment = "fixes" ), person( "Duncan", "Garmonsway" , role = c("ctb") , comment = "fixes" ), person( "Christoph", "Glur" , role = c("aut", "cre") , comment = "R interface" , email = "christoph.glur@powerpartners.pro" ) )'
+maintainer = 'Christoph Glur <christoph.glur@powerpartners.pro>'
+description = 'Create tree structures from hierarchical data, and traverse the tree in various orders. Aggregate, cumulate, print, plot, convert to and from data.frame and more. Useful for decision trees, machine learning, finance, conversion from and to JSON, and many other applications.'
+url = 'https://github.com/gluc/data.tree'
+bugreports = 'https://github.com/gluc/data.tree/issues'
+license = 'GPL (>= 2)'
+imports = ['R6', 'stringi', 'methods']
+suggests = ['Formula', 'graphics', 'testthat', 'knitr', 'rmarkdown', 'ape', 'yaml', 'networkD3', 'jsonlite', 'treemap', 'party', 'partykit', 'doParallel', 'foreach', 'htmlwidgets', 'DiagrammeR (>= 1.0.0)', 'mockery', 'rpart']
+vignettebuilder = 'knitr, rmarkdown'
+roxygennote = '7.3.2'
+encoding = 'UTF-8'
+needscompilation = 'no'
+author = 'Russ Hyde [ctb] (improve dependencies), Chris Hammill [ctb] (improve getting), Facundo Munoz [ctb] (improve list conversion), Markus Wamser [ctb] (fixed some typos), Pierre Formont [ctb] (additional features), Kent Russel [ctb] (documentation), Noam Ross [ctb] (fixes), Duncan Garmonsway [ctb] (fixes), Christoph Glur [aut, cre] (R interface)'
+
 [renv.packages.digest]
 package = 'digest'
 version = '0.6.37'
@@ -889,6 +909,32 @@ author = 'Hadley Wickham [aut, cre], Posit Software, PBC [cph, fnd], Maximilian 
 'config/testthat/edition' = '3'
 'config/needs/website' = 'tidyverse/tidytemplate'
 
+[renv.packages.igraph]
+package = 'igraph'
+version = '2.1.4'
+source = 'Repository'
+repository = 'CRAN'
+depends = ['methods', 'R (>= 3.5.0)']
+hash = ''
+title = 'Network Analysis and Visualization'
+'authors@r' = 'c( person("Gábor", "Csárdi", , "csardi.gabor@gmail.com", role = "aut", comment = c(ORCID = "0000-0001-7098-9676")), person("Tamás", "Nepusz", , "ntamas@gmail.com", role = "aut", comment = c(ORCID = "0000-0002-1451-338X")), person("Vincent", "Traag", role = "aut", comment = c(ORCID = "0000-0003-3170-3879")), person("Szabolcs", "Horvát", , "szhorvat@gmail.com", role = "aut", comment = c(ORCID = "0000-0002-3100-523X")), person("Fabio", "Zanini", , "fabio.zanini@unsw.edu.au", role = "aut", comment = c(ORCID = "0000-0001-7097-8539")), person("Daniel", "Noom", role = "aut"), person("Kirill", "Müller", , "kirill@cynkra.com", role = c("aut", "cre"), comment = c(ORCID = "0000-0002-1416-3412")), person("Maëlle", "Salmon", role = "ctb"), person("Michael", "Antonov", role = "ctb"), person("Chan Zuckerberg Initiative", role = "fnd") )'
+maintainer = 'Kirill Müller <kirill@cynkra.com>'
+description = 'Routines for simple graphs and network analysis. It can handle large graphs very well and provides functions for generating random and regular graphs, graph visualization, centrality methods and much more.'
+url = 'https://r.igraph.org/, https://igraph.org/, https://igraph.discourse.group/'
+bugreports = 'https://github.com/igraph/rigraph/issues'
+license = 'GPL (>= 2)'
+imports = ['cli', 'graphics', 'grDevices', 'lifecycle', 'magrittr', 'Matrix', 'pkgconfig (>= 2.0.0)', 'rlang', 'stats', 'utils', 'vctrs']
+suggests = ['ape (>= 5.7-0.1)', 'callr', 'decor', 'digest', 'igraphdata', 'knitr', 'rgl (>= 1.3.14)', 'rmarkdown', 'scales', 'stats4', 'tcltk', 'testthat', 'vdiffr', 'withr']
+linkingto = ['cpp11 (>= 0.5.0)']
+vignettebuilder = 'knitr'
+roxygennote = '7.3.2.9000'
+encoding = 'UTF-8'
+needscompilation = 'yes'
+author = 'Gábor Csárdi [aut] (<https://orcid.org/0000-0001-7098-9676>), Tamás Nepusz [aut] (<https://orcid.org/0000-0002-1451-338X>), Vincent Traag [aut] (<https://orcid.org/0000-0003-3170-3879>), Szabolcs Horvát [aut] (<https://orcid.org/0000-0002-3100-523X>), Fabio Zanini [aut] (<https://orcid.org/0000-0001-7097-8539>), Daniel Noom [aut], Kirill Müller [aut, cre] (<https://orcid.org/0000-0002-1416-3412>), Maëlle Salmon [ctb], Michael Antonov [ctb], Chan Zuckerberg Initiative [fnd]'
+'config/testthat/edition' = '3'
+'config/needs/website' = 'readr'
+systemrequirements = 'libxml2 (optional), glpk (>= 4.57, optional)'
+
 [renv.packages.isoband]
 package = 'isoband'
 version = '0.2.7'
@@ -1270,6 +1316,28 @@ needscompilation = 'yes'
 author = 'Gábor Csárdi [aut, cre], Hannes Mühleisen [aut, cph] (<https://orcid.org/0000-0001-8552-0029>), Google Inc. [cph], Apache Software Foundation [cph], Posit Software, PBC [cph], RAD Game Tools [cph], Valve Software [cph], Tenacious Software LLC [cph], Facebook, Inc. [cph]'
 'config/testthat/edition' = '3'
 'config/needs/website' = 'tidyverse/tidytemplate, r-lib/pkgdown, dplyr, gt, gtExtras, knitr, nycflights13, prettyunits, quarto, rmarkdown, sessioninfo, svglite'
+
+[renv.packages.networkD3]
+package = 'networkD3'
+version = '0.4.1'
+source = 'Repository'
+repository = 'CRAN'
+depends = ['R (>= 3.0.0)']
+hash = ''
+type = 'Package'
+title = 'D3 JavaScript Network Graphs from R'
+'authors@r' = 'c( person("J.J.", "Allaire", role = "aut"), person("Peter", "Ellis", role = "ctb"), person("Christopher", "Gandrud", email = "christopher.gandrud@gmail.com", role = c("aut", "cre")), person("Kevin", "Kuo", role = "ctb"), person("B.W.", "Lewis", role = "ctb"), person("Jonathan", "Owen", role = "ctb"), person("Kenton", "Russell", role = "aut"), person("Jennifer","Rogers", role = "ctb"), person("Charles", "Sese", role = "ctb"), person("CJ", "Yetman", email = "cj@cjyetman.com", role = "aut") )'
+maintainer = 'Christopher Gandrud <christopher.gandrud@gmail.com>'
+description = "Creates 'D3' 'JavaScript' network, tree, dendrogram, and Sankey graphs from 'R'."
+url = 'https://christophergandrud.github.io/networkD3/, https://github.com/christophergandrud/networkD3'
+bugreports = 'https://github.com/christophergandrud/networkD3/issues'
+license = 'GPL (>= 3)'
+imports = ['data.tree', 'htmlwidgets (>= 0.3.2)', 'igraph', 'jsonlite', 'magrittr']
+suggests = ['htmltools (>= 0.2.6)', 'tibble']
+roxygennote = '7.3.2'
+encoding = 'UTF-8'
+needscompilation = 'no'
+author = 'J.J. Allaire [aut], Peter Ellis [ctb], Christopher Gandrud [aut, cre], Kevin Kuo [ctb], B.W. Lewis [ctb], Jonathan Owen [ctb], Kenton Russell [aut], Jennifer Rogers [ctb], Charles Sese [ctb], CJ Yetman [aut]'
 
 [renv.packages.nlme]
 package = 'nlme'
