@@ -124,7 +124,7 @@ if (exists("previous_deal_data")) {
   deals <- bind_rows(previous_deal_data, update_deals)
   deal_history <- bind_rows(previous_deal_history, update_deal_history)
 } else {
-  deals <- update_deal_history
+  deals <- update_deals
   deal_history <- update_deal_history
 }
 toc()

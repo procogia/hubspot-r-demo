@@ -1,0 +1,224 @@
+---
+title: "HubSpot Lead ETL"
+subtitle: "Tracking Lead Status"
+format: 
+  html:
+    theme: cosmo
+    toc: true
+    code-fold: true
+---
+
+Creates/updates pins for leads and lead history from HubSpot.
+
+| object | Description | Pin URL | Full Pin URL |
+|----|----|----|----|
+| leads | Hubspot leads | <https://connect.procogia.com/leads/> | https://connect.procogia.com/content/51f8e6cd-0d15-419a-9a9d-7e73506dfd53 |
+| lead_history | Stage changes to leads | <https://connect.procogia.com/lead_history/> | <https://connect.procogia.com/content/13b97499-4d74-47f5-90e2-deba6f136e47> |
+
+: Pin outputs
+
+```{r setup, message=FALSE, warning=FALSE}
+library(httr2)
+library(jsonlite)
+library(dplyr)
+library(tibble)
+library(knitr)
+library(purrr)
+library(lubridate)
+library(reactable)
+library(pins)
+library(gt)
+library(nanoparquet)
+library(tictoc)
+
+# Load helper functions
+source("R/hubspot-helpers.R")
+
+# Set up token
+hubspot_token <- Sys.getenv("HUBSPOT_ACCESS_TOKEN")
+if (hubspot_token == "") {
+  stop(
+    "HubSpot access token not found. Please set HUBSPOT_ACCESS_TOKEN environment variable."
+  )
+}
+tic("Total ETL time")
+```
+
+## ETL Process for HubSpot leads
+
+### Load existing data if available
+
+**Lookup date artificially set to Jan 1, 2025 for dev purposes.**
+
+```{r}
+tic("Load existing data")
+# Check if data exists as a pin
+board <- board_connect()
+
+leads_pin_exists <- FALSE
+lead_history_pin_exists <- FALSE
+
+try(
+  {
+    leads <- board |> pin_read("leads") 
+    leads_pin_exists <- TRUE
+  },
+  silent = TRUE
+)
+
+try(
+  {
+    lead_history <- board |> pin_read("lead_history") 
+    lead_history_pin_exists <- TRUE
+  },
+  silent = TRUE
+)
+
+if (leads_pin_exists & lead_history_pin_exists) {
+  last_lead_update <- max(leads$modified_date, na.rm = TRUE)
+  cat("Loaded existing data from pins\n")
+  cat("leads:", nrow(leads), "\n")
+  cat("lead history records:", nrow(lead_history), "\n")
+  cat("Last lead modified date:", last_lead_update, "\n")
+} else {
+  cat("No existing pins found, will fetch fresh data\n")
+  last_lead_update <- ymd('2025-01-01')
+}
+toc()
+```
+
+**Limit to 200 leads for dev purposes.**
+
+### Get the stages for leads and all leads with creation time
+
+```{r get-leads}
+# Get all leads with  time stats
+all_leads <- get_all_leads_with_creation(page_limit = 100, max_pages = 2)
+
+# Show summary
+cat("Total leads:", nrow(all_leads), "\n")
+cat("Ignoring leads modified before:", last_lead_update, "\n")
+
+latest_leads <- all_leads |>
+  filter(modified_date >= last_lead_update)
+
+cat("Remaining leads:", nrow(latest_leads), "\n")
+cat(
+  "Date range:",
+  paste0(range(latest_leads$modified_date), collapse = ' to '),
+  "\n"
+)
+
+
+```
+
+### Get lead histories and join with lead info
+
+```{r lead-history}
+tic("Get lead histories")
+if (exists("leads") & exists("lead_history")) {
+  previous_lead_data <- leads |> filter(!lead_id %in% latest_leads$lead_id)
+  previous_lead_history <- lead_history |>
+    filter(!lead_id %in% latest_leads$lead_id)
+}
+update_lead_history <- get_obj_history(latest_leads$lead_id, obj_type = "leads") |> 
+  rename(lead_id = id)
+update_lead_history_count <- update_lead_history |>
+  count(lead_id, name = "n_history")
+
+# Join with lead info
+update_leads <- latest_leads |>
+  left_join(update_lead_history_count, by = "lead_id") 
+
+if (exists("previous_lead_data")) {
+  leads <- bind_rows(previous_lead_data, update_leads)
+  lead_history <- bind_rows(previous_lead_history, update_lead_history)
+} else {
+  leads <- update_leads
+  lead_history <- update_lead_history
+}
+toc()
+```
+
+### Pin the data for future use
+
+```{r pin-leads}
+board <- board_connect()
+board |>
+  pin_write(
+    leads,
+    "leads",
+    type = "parquet",
+    description = "All leads with history count"
+  )
+board |>
+  pin_write(
+    lead_history,
+    "lead_history",
+    type = "parquet",
+    description = "Lead history records"
+  )
+```
+
+## Check if any leads don't have history
+
+```{r}
+leads |> 
+  mutate(has_history = ! is.na(n_history)) |>
+  count(has_history) |>
+  gt()
+```
+
+## Leads Lookup
+
+```{r}
+leads |>
+  reactable(
+    searchable = TRUE,
+    filterable = TRUE,
+    columns = list(
+      lead_id = colDef(name = "Lead ID"),
+      lead_name = colDef(name = "Lead Name"),
+      lead_type = colDef(name = "Lead Type"),
+      lead_label = colDef(name = "Lead Label"),
+      stage_label = colDef(name = "Stage"),
+      stage_order = colDef(name = "Stage Order"),
+      created_date = colDef(name = "Created"),
+      modified_date = colDef(name = "Modified"),
+      archived = colDef(name = "Archived"),
+      n_history = colDef(name = "History Count")
+    )
+  )
+```
+
+## Lead History Lookup
+
+```{r}
+#default the leadID to the first lead with history
+default_lead_id <- leads |> filter(n_history > 0) |> slice(1) |> pull(lead_id)
+
+lead_history |>
+  select(-sourceId) |> 
+  reactable(
+    searchable = TRUE,
+    filterable = TRUE,
+    defaultPageSize = 25,
+    columns = list(
+      lead_id = colDef(
+        name = "lead ID",
+        searchable = TRUE,
+        filterable = TRUE,
+      ),
+      ts = colDef(name = "Timestamp"),
+      stage_label = colDef(name = "Stage"),
+      stage_order = colDef(name = "Stage Order"),
+      source = colDef(name = "Source")
+    )
+  )
+```
+
+## Final timing
+
+```{r}
+toc()
+```
