@@ -651,6 +651,101 @@ get_all_leads_with_creation <- function(page_limit = 100, max_pages = 0) {
   return(leads_df)
 }
 
+get_leads_after <- function(date, search_type = 'hs_lastmodifieddate', page_limit = 100, max_pages = 0) {
+  cat("🔍 Fetching leads of", search_type, "since", as.character(date), "from HubSpot...\n")
+  
+  lead_stages <- get_lead_pipeline_stages() |> 
+    select(-pipeline_id)
+  
+  # Convert date to timestamp in milliseconds
+  timestamp_ms <- as.numeric(as.POSIXct(date)) * 1000
+  
+  search_body <- list(
+    filterGroups = list(
+      list(
+        filters = list(
+          list(
+            propertyName = search_type,
+            operator = "GTE",
+            value = timestamp_ms
+          )
+        )
+      )
+    ),
+    properties = c(
+      "hs_lead_name",
+      "hs_lead_type", 
+      "hs_lead_label",
+      "hs_createdate",
+      "closedate",
+      "hs_lastmodifieddate",
+      "hs_pipeline_stage",
+      "archived"
+    ),
+    limit = page_limit
+  )
+  
+  all_leads <- list()
+  after <- NULL
+  page <- 1
+  
+  repeat {
+    tryCatch({
+      cat("📄 Fetching page", page, "...\n")
+      
+      if (!is.null(after)) {
+        search_body$after <- after
+      }
+      
+      response <- hubspot_request("/crm/v3/objects/leads/search", method = "POST", body = search_body)
+      
+      if (!is.null(response$results) && length(response$results) > 0) {
+        all_leads <- c(all_leads, response$results)
+        
+        cat("   ✅", length(response$results), "leads retrieved (total so far:", length(all_leads), ")\n")
+      }
+      
+      if (is.null(response$paging) || is.null(response$paging$`next`)) {
+        break
+      }
+      
+      if (max_pages > 0 && page >= max_pages) {
+        cat("Reached max_pages limit of", max_pages, "\n")
+        break
+      }
+      
+      after <- response$paging$`next`$after
+      page <- page + 1
+      
+      Sys.sleep(0.1)
+    },
+    error = function(e) {
+      cat("❌ Error on page", page, ":", e$message, "\n")
+      break
+    })
+  }
+  
+  cat("🎉 Total leads retrieved:", length(all_leads), "\n")
+  
+  leads_df <- map_dfr(all_leads, function(lead) {
+    props <- lead$properties
+    tibble(
+      lead_id = lead$id,
+      lead_type = props$hs_lead_type %||% "Unknown",
+      lead_name = props$hs_lead_name %||% "Unnamed lead",
+      lead_label = props$hs_lead_label %||% "Unknown",
+      created_date = as.Date(props$hs_createdate),
+      modified_date = as.Date(props$hs_lastmodifieddate),
+      archived = as.logical(props$archived %||% NA),
+      stage_id = props$hs_pipeline_stage %||% "Unknown"
+    ) |>
+      left_join(lead_stages, by = "stage_id") |> 
+      select(-stage_id)
+  })
+  
+  return(leads_df)
+}
+
 get_lead_properties <- function() {
   cat("🔍 Fetching lead properties from HubSpot...\n")
   

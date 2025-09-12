@@ -79,7 +79,7 @@ if (leads_pin_exists & lead_history_pin_exists) {
   cat("Loaded existing data from pins\n")
   cat("leads:", nrow(leads), "\n")
   cat("lead history records:", nrow(lead_history), "\n")
-  cat("Last lead modified date:", last_lead_update, "\n")
+  cat("Last lead modified date:", last_lead_update |> as.character(), "\n")
 } else {
   cat("No existing pins found, will fetch fresh data\n")
   last_lead_update <- ymd('2025-01-01')
@@ -93,11 +93,13 @@ toc()
 
 ```{r get-leads}
 # Get all leads with  time stats
-all_leads <- get_all_leads_with_creation(page_limit = 100, max_pages = 2)
+# all_leads <- get_all_leads_with_creation(page_limit = 100, max_pages = 2)
+all_leads <- get_leads_after(last_lead_update)
+stopifnot(nrow(all_leads) > 0)
 
 # Show summary
 cat("Total leads:", nrow(all_leads), "\n")
-cat("Ignoring leads modified before:", last_lead_update, "\n")
+cat("Ignoring leads created before:", last_lead_update |> as.character(), "\n")
 
 latest_leads <- all_leads |>
   filter(modified_date >= last_lead_update)
