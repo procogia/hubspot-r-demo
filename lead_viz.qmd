@@ -46,13 +46,20 @@ leads |>
 ```{r}
 # Create transitions from lead_history
 transitions <- lead_history |>
-    filter(! str_detect(stage_label, "SAL")) |>
+  filter(!str_detect(stage_label, "SAL")) |>
   arrange(lead_id, ts) |>
   group_by(lead_id) |>
-  mutate(next_stage = lead(stage_label)) |>
+  mutate(
+    next_stage = lead(stage_label),
+    days_in_stage = as.numeric(difftime(lead(ts), ts, units = "days"))
+  ) |>
   filter(!is.na(next_stage)) |>
-  count(stage_label, next_stage, name = "value") |>
-  ungroup()
+  group_by(stage_label, next_stage) |>
+  summarise(
+    value = n(),
+    avg_days_in_stage = mean(days_in_stage, na.rm = TRUE),
+    .groups = 'drop'
+  ) 
 
 # Create nodes
 nodes <- data.frame(
@@ -70,9 +77,16 @@ links <- transitions |>
   select(source, target, value)
 
 # Create sankey diagram
-sankeyNetwork(Links = links, Nodes = nodes, Source = "source",
-              Target = "target", Value = "value", NodeID = "name",
-              fontSize = 12, nodeWidth = 30)
+sankeyNetwork(
+  Links = links,
+  Nodes = nodes,
+  Source = "source",
+  Target = "target",
+  Value = "value",
+  NodeID = "name",
+  fontSize = 12,
+  nodeWidth = 30
+)
 ```
 
 SAL... stages are excluded.
@@ -83,8 +97,6 @@ SAL... stages are excluded.
 
 ```{r}
 transitions |>
-  group_by(stage_label, next_stage) |> 
-  summarise(count = n(), .groups = 'drop') |>
-  arrange(desc(count)) |>
-  gt::gt()
+  arrange(desc(value)) |>
+  gt::gt() |> gt::fmt_number(decimals = 0) 
 ```

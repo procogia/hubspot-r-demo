@@ -11,9 +11,9 @@ id = 'd32727ce-893f-4d83-b9ab-5cc3ba086fc1'
 dashboard_url = 'https://connect.procogia.com/connect/#/apps/d32727ce-893f-4d83-b9ab-5cc3ba086fc1'
 direct_url = 'https://connect.procogia.com/content/d32727ce-893f-4d83-b9ab-5cc3ba086fc1/'
 logs_url = 'https://connect.procogia.com/connect/#/apps/d32727ce-893f-4d83-b9ab-5cc3ba086fc1/logs'
-deployed_at = '2025-09-12T15:08:27-07:00'
-bundle_id = '277507'
-bundle_url = 'https://connect.procogia.com/__api__/v1/content/d32727ce-893f-4d83-b9ab-5cc3ba086fc1/bundles/277507/download'
+deployed_at = '2025-09-12T16:53:49-07:00'
+bundle_id = '277512'
+bundle_url = 'https://connect.procogia.com/__api__/v1/content/d32727ce-893f-4d83-b9ab-5cc3ba086fc1/bundles/277512/download'
 files = [
   '.posit/publish/Lead Stage Transitions-PC9D.toml',
   '.posit/publish/deployments/deployment-D42D.toml',
