@@ -1,0 +1,183 @@
+---
+title: "Deal Viz Spec"
+format: 
+  html:
+    theme: cosmo
+    toc: true
+    code-fold: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r}
+library(dplyr)
+library(networkD3)
+library(pins)
+library(stringr)
+library(lubridate)
+```
+
+## Load deal history data
+
+Pinned via [HubSpot Deal ETL](https://connect.procogia.com/content/19772643-5fc6-49c3-9fc9-c49a85835915)
+
+
+```{r}
+board <- board_connect()
+deals <- board |> pin_read("deals")
+deal_history <- board |> pin_read("deal_history")
+```
+
+
+```{r}
+cat("deals:", nrow(deals), "\n")
+cat("deal history records:", nrow(deal_history), "\n")
+
+deals |> 
+    mutate(`Year Created` = year(created_date)) |>
+    count(`Year Created`) |> 
+    gt::gt() 
+```
+
+## Sankey diagram
+
+```{r}
+closed_after <- ymd("2025-01-01")
+created_after <- ymd("2025-01-01")
+ignore_after <- today() 
+open_deals <- deals |> 
+  filter(close_date >= closed_after,
+         created_date >= created_after)
+
+
+# Create transitions from deal_history
+transitions_raw <- deal_history |>
+  filter(deal_id %in% open_deals$deal_id) |>
+  filter(ts < ignore_after) |>
+  mutate(stage_label = ifelse(is.na(stage_label), stage_id, stage_label)) |>
+  mutate(
+    stage_label = ifelse(
+      str_detect(stage_label, '^[0-9]+$'),
+      'UKNOWN',
+      stage_label
+    )
+  ) |>
+  arrange(deal_id, ts) |>
+  group_by(deal_id) |>
+  mutate(next_stage = lead(stage_label)) |>
+  filter(next_stage != stage_label) |>
+  mutate(days_in_stage = as.numeric(difftime(lead(ts), ts, units = "days"))) |>
+  filter(!is.na(next_stage))
+
+transitions_invalid <- transitions_raw |>
+  filter(
+    stage_label %in%
+      c('UKNOWN', 'Closed Lost', 'Closed Won') |
+      next_stage %in% c('UKNOWN', 'Qualification')
+  ) |>
+  pull(deal_id) |>
+  unique()
+
+transitions <- transitions_raw |>
+  filter(!deal_id %in% transitions_invalid) |>
+  group_by(stage_label, next_stage) |>
+  summarise(
+    value = n(),
+    avg_days_in_stage = mean(days_in_stage, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+
+# Create nodes
+nodes <- data.frame(
+  name = unique(c(transitions$stage_label, transitions$next_stage)),
+  stringsAsFactors = FALSE
+) |>
+  mutate(id = row_number() - 1)
+
+# Create links with node IDs
+links <- transitions |>
+  left_join(nodes, by = c("stage_label" = "name")) |>
+  rename(source = id) |>
+  left_join(nodes, by = c("next_stage" = "name")) |>
+  rename(target = id) |>
+  select(source, target, value)
+
+# Create sankey diagram
+sankeyNetwork(
+  Links = links,
+  Nodes = nodes,
+  Source = "source",
+  Target = "target",
+  Value = "value",
+  NodeID = "name",
+  fontSize = 12,
+  nodeWidth = 30
+)
+
+# report date filters and number of deals
+cat("Deals created after:", as.character(created_after), "\n")
+cat("Deals closing after:", as.character(closed_after), "\n")
+cat("Ignoring deal history after:", as.character(ignore_after), "\n")
+```
+
+## Deals with Invalid Transitions
+```{r}
+# View invalid transitions
+bad_transitions <- transitions_raw |>
+  filter(deal_id %in% transitions_invalid) |>
+  group_by(stage_label, next_stage) |>
+  summarise(
+    value = n(),
+    avg_days_in_stage = mean(days_in_stage, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+
+# Create nodes
+bad_nodes <- data.frame(
+  name = unique(c(bad_transitions$stage_label, bad_transitions$next_stage)),
+  stringsAsFactors = FALSE
+) |>
+  mutate(id = row_number() - 1)
+
+# Create links with node IDs
+bad_links <- bad_transitions |>
+  left_join(bad_nodes, by = c("stage_label" = "name")) |>
+  rename(source = id) |>
+  left_join(bad_nodes, by = c("next_stage" = "name")) |>
+  rename(target = id) |>
+  select(source, target, value)
+
+# Create sankey diagram
+sankeyNetwork(
+  Links = bad_links,
+  Nodes = bad_nodes,
+  Source = "source",
+  Target = "target",
+  Value = "value",
+  NodeID = "name",
+  fontSize = 12,
+  nodeWidth = 30
+)
+
+if (nrow(bad_transitions) > 0) {
+  cat("Deals with invalid transitions:", length(transitions_invalid), "\n")
+  cat("Invalid transitions:\n")
+  print(bad_transitions)
+} else {
+  cat("No invalid transitions found.\n")
+}
+```
+## Stage Transition Table
+
+
+
+```{r}
+transitions |>
+  arrange(desc(value)) |>
+  gt::gt() |> gt::fmt_number(decimals = 0) 
+```
+
