@@ -199,7 +199,7 @@ transitions |>
 ```{r}
 stages <- c("Qualification", "Exploration", "Proposal", "Forecasted", "Closed Won", "Closed Lost") |> rev()
 
-view_date <- today() - months(3)
+view_date <- ymd("2025-07-07") # today() 
 open_deals <- deals |>
   filter(created_date <= view_date,
          is.na(close_date) | close_date >= view_date) 
