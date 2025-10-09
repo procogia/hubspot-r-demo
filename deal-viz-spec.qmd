@@ -125,9 +125,14 @@ sankeyNetwork(
 )
 
 # report date filters and number of deals
-cat("Deals created after:", as.character(created_after), "\n")
-cat("Deals closing after:", as.character(closed_after), "\n")
-cat("Ignoring deal history after:", as.character(ignore_after), "\n")
+tribble(
+  ~"Param", ~"DateValue",
+  "Deals created after", as.character(created_after),
+  "Deals closing after", as.character(closed_after),
+  "Ignoring deal history after", as.character(ignore_after),
+  "Number of open deals", as.character(nrow(open_deals))
+) |> gt::gt()
+
 ```
 
 ## Deals with Invalid Transitions
@@ -222,7 +227,11 @@ deal_plt <- deal_snapshot |>
          latest_stage = factor(latest_stage, levels = stages)) |>
   ggplot(aes(y = stage_on_date, x = days_open, color = latest_stage,
   deal_name = deal_name, id = id)) +
-  geom_point(aes(size = amount), alpha = 0.7) 
+  geom_point(aes(size = amount), alpha = 0.7, position = position_jitter(height = 0.2, width = 0)) +
+  guides(size = "none") + # This removes the size/amount legend
+  labs(title = sprintf("Active Deals as of %s", as.character(view_date)),
+         x = "Days Since Creation",
+         y = "Stage on Date") 
 
 ggplotly(deal_plt, tooltip = c("id", "deal_name", "amount", "created_date", "days_open", "stage_on_date", "latest_stage"))
 ```
