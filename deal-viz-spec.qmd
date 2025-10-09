@@ -17,6 +17,9 @@ library(networkD3)
 library(pins)
 library(stringr)
 library(lubridate)
+library(ggplot2)
+library(plotly)
+
 ```
 
 ## Load deal history data
@@ -185,3 +188,38 @@ transitions |>
   gt::gt() |> gt::fmt_number(decimals = 0) 
 ```
 
+## Active Deals by Stage
+
+
+```{r}
+stages <- c("Qualification", "Exploration", "Proposal", "Forecasted", "Closed Won", "Closed Lost") |> rev()
+
+view_date <- today() - months(3)
+open_deals <- deals |>
+  filter(created_date <= view_date,
+         is.na(close_date) | close_date >= view_date) 
+
+last_history <- deal_history |>
+  filter(deal_id %in% open_deals$deal_id) |>
+  group_by(deal_id) |>
+  filter(ts <= view_date + hours(16)) |>
+  filter(ts == max(ts)) |>
+  ungroup() |>
+  select(deal_id, stage = stage_label)
+
+deal_snapshot <- open_deals |>
+  select(deal_id, deal_name, amount, created_date, close_date, stage_label) |>
+  left_join(last_history, by = "deal_id") |> 
+  mutate(days_open = as.numeric(difftime(view_date, created_date, units = "days"))) |> 
+  select(deal_name, amount, created_date, days_open, stage_on_date = stage, latest_stage = stage_label) |> 
+  arrange(created_date) |> 
+  mutate(id = row_number(),
+         stage_on_date = ifelse(is.na(stage_on_date), latest_stage, stage_on_date)
+         )
+
+deal_snapshot |> 
+  mutate(stage_on_date = factor(stage_on_date, levels = stages),
+         latest_stage = factor(latest_stage, levels = stages)) |>
+  ggplot(aes(y = stage_on_date, x = days_open, color = latest_stage)) +
+  geom_point(aes(size = amount), alpha = 0.7) 
+```
