@@ -88,7 +88,9 @@ all_deals <- get_all_deals_with_creation()
 
 # Show summary
 cat("Total deals:", nrow(all_deals), "\n")
-cat("Ignoring deals modified before:", last_deal_update, "\n")
+cat(sprintf("Ignoring deals modified before:%s\n",
+            as.character(last_deal_update)))
+
 
 latest_deals <- all_deals |>
   filter(modified_date >= last_deal_update)
