@@ -217,9 +217,12 @@ deal_snapshot <- open_deals |>
          stage_on_date = ifelse(is.na(stage_on_date), latest_stage, stage_on_date)
          )
 
-deal_snapshot |> 
+deal_plt <- deal_snapshot |> 
   mutate(stage_on_date = factor(stage_on_date, levels = stages),
          latest_stage = factor(latest_stage, levels = stages)) |>
-  ggplot(aes(y = stage_on_date, x = days_open, color = latest_stage)) +
+  ggplot(aes(y = stage_on_date, x = days_open, color = latest_stage,
+  deal_name = deal_name, id = id)) +
   geom_point(aes(size = amount), alpha = 0.7) 
+
+ggplotly(deal_plt, tooltip = c("id", "deal_name", "amount", "created_date", "days_open", "stage_on_date", "latest_stage"))
 ```
