@@ -46,10 +46,9 @@ deals |>
 ```{r}
 closed_after <- ymd("2025-01-01")
 created_after <- ymd("2025-01-01")
-ignore_after <- today() 
-open_deals <- deals |> 
-  filter(close_date >= closed_after,
-         created_date >= created_after)
+ignore_after <- today()
+open_deals <- deals |>
+  filter(close_date >= closed_after, created_date >= created_after)
 
 
 # Create transitions from deal_history
@@ -66,9 +65,14 @@ transitions_raw <- deal_history |>
   ) |>
   arrange(deal_id, ts) |>
   group_by(deal_id) |>
-  mutate(next_stage = lead(stage_label)) |>
-  filter(next_stage != stage_label) |>
-  mutate(days_in_stage = as.numeric(difftime(lead(ts), ts, units = "days"))) |>
+  mutate(next_stage = lead(stage_label), this_stage = stage_label) |>
+  filter(is.na(next_stage) | next_stage != stage_label | row_number() == 1) |>
+  mutate(day_calc = as.numeric(difftime(lead(ts), ts, units = "days"))) |>
+  group_by(deal_id, stage_label) |>
+  mutate(days_in_stage = cumsum(day_calc)) |>
+  group_by(deal_id) |>
+  filter(row_number() != 1) |>
+  ungroup() |> 
   filter(!is.na(next_stage))
 
 transitions_invalid <- transitions_raw |>
